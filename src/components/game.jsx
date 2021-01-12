@@ -213,7 +213,7 @@ const Game = () => {
             <p className="text-light text-center small-text p-0 mt-2">Voting</p>
             <div className="d-grid gap-2 mx-2 mt-2">
               {votes.map((vote) => (
-                <button key={vote} onClick={() => voteClicked(vote)} className="btn btn-outline-light btn-block" type="button">{vote}</button>
+                <button key={vote} onClick={() => voteClicked(vote)} className="btn btn-lg btn-outline-light btn-block" type="button">{vote}</button>
               ))}
             </div>
           </React.Fragment>
