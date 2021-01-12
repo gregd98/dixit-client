@@ -50,7 +50,7 @@ const Host = () => {
   }, [dispatch, socket]);
 
   useEffect(() => {
-    if (gameState && gameState.state === 3) {
+    if (gameState) {
       const s = [];
       for (let i = 0; i < gameInfo.players.length; i += 1) {
         const player = gameInfo.players[i];
@@ -224,13 +224,13 @@ const Host = () => {
               <div className="d-flex justify-content-center mb-4 mt-2">
                 <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '80px' }} />
               </div>
-              {getScores().map((score) => (
+              {scores.map((score) => (
                 <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
                   <div className="col-10 p-0 m-0">
                     <p key={score.name} className="text-light score-text nowrap" >{score.name}</p>
                   </div>
                   <div className="d-flex justify-content-start col-2 p-0 m-0 ml-2">
-                    <p key={score.name} className="text-light score-text"><b>{score.score}</b></p>
+                    <p key={score.name} className="text-light score-text"><b>{score.score.total}</b></p>
                   </div>
                 </div>
               ))}
