@@ -76,7 +76,7 @@ const Host = () => {
 
   useEffect(() => {
     const setSizes = () => {
-      const n = gameInfo.players.length;
+      const n = gameInfo.players.length !== 3 ? gameInfo.players.length : 5;
       if (n > 0) {
         const h = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const w = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
@@ -108,10 +108,22 @@ const Host = () => {
         }]);
         break;
       case 1:
-        setCircles(otherPlayers.map((player) => ({
-          color: player.color,
-          active: gameState.playersPicked.includes(player.id),
-        })));
+        if (gameInfo.players.length !== 3) {
+          setCircles(otherPlayers.map((player) => ({
+            color: player.color,
+            active: gameState.playersPicked.includes(player.id),
+          })));
+        }
+        setCircles(otherPlayers.reduce((acc, player) => {
+          const { color } = player;
+          const pick = gameState.playersPicked.find((item) => item.playerId === player.id);
+          acc.push({
+            color, active: !!pick,
+          }, {
+            color, active: !!pick && pick.both,
+          });
+          return acc;
+        }, []));
         break;
       default: break;
     }
@@ -149,8 +161,12 @@ const Host = () => {
     if (cardId === gameState.originalCardId) {
       return gameInfo.players.find((player) => player.id === gameState.currentPlayer).name;
     }
+    if (gameInfo.players.length !== 3) {
+      return gameInfo.players.find((player) => player.id === gameState.playersPicked
+        .find((item) => cardId === item.card.id).playerId).name;
+    }
     return gameInfo.players.find((player) => player.id === gameState.playersPicked
-      .find((item) => cardId === item.card.id).playerId).name;
+      .find((item) => !!item.cards.find((card) => card.id === cardId)).playerId).name;
   };
 
   const renderTable = () => (
@@ -175,26 +191,6 @@ const Host = () => {
       </div>
     </React.Fragment>
   );
-
-  const getScores = () => {
-    const s = gameInfo.players.map((player) => ({
-      name: player.name,
-      score: gameState.scores.find((score) => score.playerId === player.id).score.total,
-    }));
-    const sorter = (a, b) => {
-      if (a.score > b.score) {
-        return -1;
-      }
-      if (a.score < b.score) {
-        return 1;
-      }
-      if (a.name < b.name) {
-        return -1;
-      }
-      return 1;
-    };
-    return s.sort(sorter);
-  };
 
   switch (gameState.state) {
     case 0:
@@ -243,13 +239,6 @@ const Host = () => {
       return renderTable();
     case 3:
       return renderTable();
-      // return (
-      //   <div>
-      //     {scores.map((score) => (
-      //       <p key={score.name}>{score.name} {score.score.total} {score.score.lastRound}</p>
-      //     ))}
-      //   </div>
-      // );
     default:
       return <h1>Error</h1>;
   }

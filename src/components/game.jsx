@@ -44,10 +44,15 @@ const Game = () => {
   }, [gameInfo.players, gameInfo.playerId, dispatch]);
 
   useEffect(() => {
-    if (gameState && gameState.state === 2) {
+    if (gameState && gameState.state === 2 && gameState.ownCardIndex) {
       const v = [];
-      for (let i = 1; i <= gameInfo.players.length; i += 1) {
-        if (i !== gameState.ownCardIndex) {
+      const n = gameInfo.players.length !== 3 ? gameInfo.players.length : 5;
+      for (let i = 1; i <= n; i += 1) {
+        if (gameInfo.players.length !== 3) {
+          if (i !== gameState.ownCardIndex) {
+            v.push(i);
+          }
+        } else if (!gameState.ownCardIndex.includes(i)) {
           v.push(i);
         }
       }
@@ -183,13 +188,33 @@ const Game = () => {
                         pickFunc={pickCard}
           />;
         }
-        if (gameState.playersPicked.includes(gameInfo.playerId)) {
-          return <Cards hand={gameState.hand}
-                        withBtn={false}
-                        header={'Waiting for other players.'}
-                        pickFunc={pickCard}
-          />;
+        if (gameInfo.players.length !== 3) {
+          if (gameState.playersPicked.includes(gameInfo.playerId)) {
+            return <Cards hand={gameState.hand}
+                          withBtn={false}
+                          header={'Waiting for other players.'}
+                          pickFunc={pickCard}
+            />;
+          }
+        } else {
+          const playersPick = gameState.playersPicked
+            .find((item) => item.playerId === gameInfo.playerId);
+          if (playersPick) {
+            if (playersPick.both) {
+              return <Cards hand={gameState.hand}
+                            withBtn={false}
+                            header={'Waiting for other players.'}
+                            pickFunc={pickCard}
+              />;
+            }
+            return <Cards hand={gameState.hand}
+                          withBtn={true}
+                          header={`Pick another card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`}
+                          pickFunc={pickCard}
+            />;
+          }
         }
+
         return <Cards hand={gameState.hand}
                       withBtn={true}
                       header={`Pick a card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`}

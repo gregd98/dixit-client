@@ -125,8 +125,17 @@ body {
 }
 
 .lobby-text {
-    font-family: Raleway, sans-serif;
+    font-family: Roboto, sans-serif;
     font-size: 12mm;
+}
+
+.lobby-mono {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12mm;
+}
+
+.code-spacing {
+    letter-spacing: .1em
 }
 
 .score-text {
@@ -146,7 +155,11 @@ body {
 .dixit-title {
     font-family: dilana, sans-serif;
     font-size: 36mm;
+}
 
+.small-roboto {
+    font-family: Roboto, sans-serif;
+    font-size: 6mm;
 }
 
 .score-small-text {
@@ -160,4 +173,8 @@ body {
     -o-transition: .2s;
     transition: .2s;
     margin-top: 16mm !important;
+}
+
+.custom-range::-webkit-slider-thumb {
+    background: white;
 }

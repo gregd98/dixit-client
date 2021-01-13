@@ -3,22 +3,34 @@ import { useDispatch, useSelector } from 'react-redux';
 import socketIOClient from 'socket.io-client';
 import { restGet, restPut } from '../utils/communication';
 import { SERVER_PATH } from '../constants';
-import {updatePlayers, updateState} from '../actions/gameActions';
+import { updatePlayers, updateState } from '../actions/gameActions';
+import ErrorPage from './error_page.jsx';
 
 const Lobby = () => {
-  const game = useSelector((state) => state.game.game);
+  const gameInfo = useSelector((state) => state.game.game);
   const [editions, setEditions] = useState([]);
   const [checkedEditions, setCheckedEditions] = useState(new Set());
+  const [cardCount, setCardCount] = useState({ value: 0, min: 0, max: 0 });
+  const [selectEditionText, setSelectEditionText] = useState('');
+  const [gameLength, setGameLength] = useState({ rounds: 0, turns: 0 });
   const [socket, setSocket] = useState(null);
   const [hoverPlayer, setHoverPlayer] = useState(undefined);
+  const [pageDisabled, setPageDisabled] = useState(false);
+
+  const [startError, setStartError] = useState('');
+  const [pageError, setPageError] = useState({});
+  const [isLoading, setLoading] = useState(true);
 
   const dispatch = useDispatch();
 
   useEffect(() => {
+    setLoading(true);
     restGet(`${SERVER_PATH}api/editions`).then((result) => {
       setEditions(result);
+      setLoading(false);
     }).catch((error) => {
-      console.log(error.message);
+      setPageError(error);
+      setLoading(false);
     });
   }, []);
 
@@ -42,6 +54,39 @@ const Lobby = () => {
     }
   }, [dispatch, socket]);
 
+  useEffect(() => {
+    const playerCount = gameInfo.players.length;
+    const maxCardCount = editions
+      .reduce((acc, value) => (checkedEditions.has(value.id) ? acc + value.cards : acc), 0);
+    const minCardCount = playerCount !== 3 ? 5 * playerCount + playerCount ** 2 : 31;
+    if (playerCount === 0 || maxCardCount === 0 || maxCardCount < minCardCount) {
+      setCardCount((current) => ({
+        ...current, value: 0, min: 0, max: 0,
+      }));
+      if (maxCardCount < minCardCount) {
+        if (checkedEditions.size === 0) {
+          setSelectEditionText('Select editions!');
+        } else {
+          setSelectEditionText('Not enough cards, select more editions!');
+        }
+      }
+    } else {
+      setCardCount((current) => ({
+        ...current, value: minCardCount, min: minCardCount, max: maxCardCount,
+      }));
+      setSelectEditionText('');
+    }
+  }, [editions, checkedEditions, gameInfo.players.length]);
+
+  useEffect(() => {
+    const cards = cardCount.value;
+    const playerCount = gameInfo.players.length;
+    const handSize = playerCount === 3 ? 7 : 6;
+    const divider = playerCount === 3 ? 5 : playerCount;
+    const rounds = Math.floor((cards - playerCount * handSize) / divider + 1);
+    setGameLength({ rounds, turns: Math.floor(rounds / playerCount) });
+  }, [cardCount.value, gameInfo.players.length]);
+
   const toggleEdition = (edition) => {
     const tmp = new Set(checkedEditions);
     const { id } = edition;
@@ -51,23 +96,21 @@ const Lobby = () => {
       tmp.add(id);
     }
     setCheckedEditions(tmp);
-    console.log(tmp);
-  };
-
-  const getMaxCardNumber = () => {
-    let result = 0;
-    editions.forEach((edition) => {
-      if (checkedEditions.has(edition.id)) {
-        result += edition.cards;
-      }
-    });
-    return result;
   };
 
   const startGame = () => {
-    restPut(`${SERVER_PATH}api/games/start`, { editions: Array.from(checkedEditions) }).then(() => {
-      console.log('Game started!');
-    });
+    setPageDisabled(true);
+    setStartError('');
+    restPut(`${SERVER_PATH}api/games/start`, {
+      editions: Array.from(checkedEditions),
+      cardCount: Number.parseInt(cardCount.value, 10),
+    }).then(() => {
+      setPageDisabled(false);
+    })
+      .catch((error) => {
+        setPageDisabled(false);
+        setStartError(`Error: ${error.message}`);
+      });
   };
 
   const kickPlayer = (playerId) => {
@@ -92,27 +135,77 @@ const Lobby = () => {
     }
   };
 
+  const renderInputCardRange = () => {
+    const handleInputChange = (event) => {
+      const { value } = event.target;
+      setCardCount((rest) => ({ ...rest, value }));
+    };
+    return (
+      <React.Fragment>
+        <input
+          onChange={handleInputChange}
+          min={cardCount.min}
+          max={cardCount.max}
+          type="range"
+          className="form-control-range custom-range"
+          id="inputCardCount"
+          value={cardCount.value}
+          disabled={pageDisabled}/>
+      </React.Fragment>
+    );
+  };
+
+  if (pageError.message) {
+    return <ErrorPage status={pageError.status} message={pageError.message} />;
+  }
+
+  if (isLoading) {
+    return <React.Fragment />;
+  }
+
   return (
     <React.Fragment>
       <p className="text-center text-light dixit-title">Host</p>
       <div className="d-flex justify-content-center mt-4">
-        <div className="list-group edition-list shadow mx-4">
+        <div className="list-group edition-list shadow mx-4 darkBg">
           {editions
             .map(
               (edition) => (
                 <div onClick={() => toggleEdition(edition)} key={edition.id} className="list-group-item d-flex justify-content-between align-items-center clickable darkBg" >
                   <p className="m-0 p-0 text-light edition-text">{edition.name}</p>
-                  <input onChange={() => toggleEdition(edition)} className="form-check-input-lg" type="checkbox" id={`ch-${edition.id}`} checked={checkedEditions.has(edition.id)}/>
+                  <input onChange={() => toggleEdition(edition)} className="form-check-input-lg" type="checkbox"
+                         id={`ch-${edition.id}`} checked={checkedEditions.has(edition.id)} disabled={pageDisabled}/>
                 </div>
               ),
             )}
         </div>
         <div className="mx-4">
-          <p className="text-light lobby-text">URL: <b>{game.ip ? `http://${game.ip}/` : 'N/A'}</b></p>
-          <p className="text-light lobby-text">Code: <b>{game.code}</b></p>
+          <p className="text-light lobby-text">URL: <b>{gameInfo.ip ? `http://${gameInfo.ip}/` : 'N/A'}</b></p>
+          <p className="text-light lobby-text mb-4">Code: <b className="code-spacing">{gameInfo.code}</b></p>
+          {gameInfo.players.length >= 3 ? (
+            <React.Fragment>
+              {selectEditionText ? (
+                  <p className="text-light small-text">{selectEditionText}</p>
+              ) : (
+                <React.Fragment>
+                  {renderInputCardRange()}
+                  <p className="text-light small-roboto mt-4">Cards: <b>{cardCount.value}</b></p>
+                  <p className="text-light small-roboto">Rounds: <b>{gameLength.rounds}</b></p>
+                  <p className="text-light small-roboto">Each player turns: <b>{gameLength.turns}</b></p>
+                  <button onClick={startGame} className="btn btn-lg btn-block btn-outline-light mt-4" disabled={pageDisabled}>
+                    Start game
+                    {pageDisabled && <span className="spinner-border spinner-border-sm ml-2" role="status" aria-hidden="true" />}
+                  </button>
+                  {startError && (<div className="alert alert-danger mt-4" role="alert">{startError}</div>)}
+                </React.Fragment>
+              )}
+            </React.Fragment>
+          ) : (
+            <p className="text-light small-text">Waiting players to join.</p>
+          )}
         </div>
         <div className="list-group edition-list shadow mx-4 darkBg">
-          {game.players.map((player, i) => (
+          {gameInfo.players.map((player, i) => (
             <div key={player.id} onMouseEnter={() => playerMouseEnter(i)} onMouseLeave={() => playerMouseLeave(i)} className="list-group-item d-flex justify-content-between align-items-center darkBg" >
               <div className="d-flex flex-row">
                 <p className="m-0 p-0 text-light edition-text">{player.name}</p>
@@ -120,16 +213,16 @@ const Lobby = () => {
               </div>
               {hoverPlayer === i && (
                 <div>
-                  <button onClick={() => adminPlayer(player.id)} className="btn btn-sm btn-outline-secondary mr-2" type="button">A</button>
-                  <button onClick={() => kickPlayer(player.id)} className="btn btn-sm btn-outline-danger" type="button">X</button>
+                  <button onClick={() => adminPlayer(player.id)} className="btn btn-sm btn-outline-secondary mr-2"
+                          type="button" disabled={pageDisabled}>A</button>
+                  <button onClick={() => kickPlayer(player.id)} className="btn btn-sm btn-outline-danger"
+                          type="button" disabled={pageDisabled}>X</button>
                 </div>
               )}
             </div>
           ))}
         </div>
       </div>
-      <h4>{getMaxCardNumber()}</h4>
-      <button onClick={startGame} className="btn btn-primary">Start game</button>
     </React.Fragment>
   );
 };
