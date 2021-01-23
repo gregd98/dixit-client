@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import socketIOClient from 'socket.io-client';
-import {loadGameData, resetGame, updatePlayers, updateState} from '../actions/gameActions';
+import {
+  loadGameData, resetGame, updatePlayers, updateState,
+} from '../actions/gameActions';
 import PlayerList from './player_list.jsx';
 import { COLORS, SERVER_PATH } from '../constants';
-import {restDelete, restGet} from '../utils/communication';
+import { restDelete, restGet } from '../utils/communication';
 import * as Constants from '../constants';
 
 const Host = () => {
@@ -42,8 +44,6 @@ const Host = () => {
         dispatch(updateState(payload));
       });
       socket.on('player update', (payload) => {
-        console.log('Players:');
-        console.log(payload);
         dispatch(updatePlayers(payload));
       });
       socket.on('game deleted', () => {
@@ -85,7 +85,7 @@ const Host = () => {
         const w = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         let mh = Math.ceil(h - 16 - 60);
         let mw = Math.ceil((w - n * 16) / n);
-        if (mw < 320) {
+        if (mw < 250) {
           mw = Math.ceil(((w - n * 8) / (n + (n % 2 === 0 ? 0 : 1))) * 2);
           mh = Math.ceil((h - 16 - 60) * 0.5);
         }
@@ -145,8 +145,7 @@ const Host = () => {
     });
   };
 
-  const renderWithNav = (content) => {
-    return (
+  const renderWithNav = (content) => (
       <React.Fragment>
         <nav className="navbar navbar-light fixed-top mt-2 p-0 mr-2" style={{ background: 'transparent' }}>
           <span />
@@ -154,8 +153,7 @@ const Host = () => {
         </nav>
         {content}
       </React.Fragment>
-    );
-  };
+  );
 
   const getPlayerNameById = (playerId) => {
     const p = gameInfo.players.find((player) => player.id === playerId);
@@ -229,7 +227,7 @@ const Host = () => {
           <div className="card darkBg mx-4 shadow mt-4" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
             <div className="card-body">
               <div className="d-flex justify-content-center mb-4 mt-2">
-                <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '80px' }} />
+                <img className="coup-image" src={`${SERVER_PATH}coup.png`} alt="coup" />
               </div>
               {scores.map((score) => (
                 <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
@@ -275,7 +273,7 @@ const Host = () => {
               <div className="card darkBg mx-4 shadow" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
                 <div className="card-body">
                   <div className="d-flex justify-content-center mb-4 mt-2">
-                    <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '20mm' }} />
+                    <img  className="coup-image" src={`${SERVER_PATH}coup.png`} alt="coup" />
                   </div>
                   {scores.map((score) => (
                     <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">

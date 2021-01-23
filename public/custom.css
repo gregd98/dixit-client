@@ -194,3 +194,14 @@ body {
 .exit-icon {
     font-size: 10mm;
 }
+
+img {
+    image-orientation: from-image;
+}
+
+.coup-image {
+    width: 20mm;
+    max-width: 20mm;
+    height: 20mm;
+    max-height: 20mm;
+}
