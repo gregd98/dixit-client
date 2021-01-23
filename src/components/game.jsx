@@ -3,7 +3,7 @@ import socketIOClient from 'socket.io-client';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetGame, updatePlayers, updateState } from '../actions/gameActions';
 import { COLORS, SERVER_PATH } from '../constants';
-import {restDelete, restPut} from '../utils/communication';
+import { restDelete, restPut } from '../utils/communication';
 
 const classNames = require('classnames');
 
@@ -70,7 +70,7 @@ const Game = () => {
   }, [gameInfo.players.length, gameState]);
 
   useEffect(() => {
-    if (gameState && gameState.state === 3) {
+    if (gameState && (gameState.state === 3 || gameState.isOver)) {
       const s = [];
       for (let i = 0; i < gameInfo.players.length; i += 1) {
         const player = gameInfo.players[i];
@@ -79,13 +79,6 @@ const Game = () => {
           score: gameState.scores.find((item) => item.playerId === player.id).score,
         });
       }
-      // const n = 12 - gameInfo.players.length;
-      // for (let i = 0; i < n; i += 1) {
-      //   s.push({
-      //     name: `${i}`,
-      //     score: 88,
-      //   });
-      // }
       setScores(s.sort((a, b) => {
         if (a.score.total > b.score.total) {
           return -1;
@@ -352,6 +345,8 @@ const Game = () => {
     }
   }
   if (gameState.isOver) {
+    console.log('Game over scores:');
+    console.log(scores);
     return (
       <React.Fragment>
         <p className="text-light text-center small-text p-0 mt-2">Game Over</p>

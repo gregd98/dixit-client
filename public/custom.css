@@ -190,3 +190,7 @@ body {
 .custom-range::-webkit-slider-thumb {
     background: white;
 }
+
+.exit-icon {
+    font-size: 10mm;
+}

@@ -4,7 +4,7 @@ import socketIOClient from 'socket.io-client';
 import {loadGameData, resetGame, updatePlayers, updateState} from '../actions/gameActions';
 import PlayerList from './player_list.jsx';
 import { COLORS, SERVER_PATH } from '../constants';
-import { restGet } from '../utils/communication';
+import {restDelete, restGet} from '../utils/communication';
 import * as Constants from '../constants';
 
 const Host = () => {
@@ -137,6 +137,26 @@ const Host = () => {
     console.log(circles);
   }, [circles]);
 
+  const exitGame = () => {
+    restDelete(`${SERVER_PATH}api/games`).then(() => {
+      dispatch(resetGame());
+    }).catch((error) => {
+      console.log(error.message);
+    });
+  };
+
+  const renderWithNav = (content) => {
+    return (
+      <React.Fragment>
+        <nav className="navbar navbar-light fixed-top mt-2 p-0 mr-2" style={{ background: 'transparent' }}>
+          <span />
+          <span onClick={exitGame} className="material-icons text-danger exit-icon clickable float-right p-0 mr-2 mt-2">close</span>
+        </nav>
+        {content}
+      </React.Fragment>
+    );
+  };
+
   const getPlayerNameById = (playerId) => {
     const p = gameInfo.players.find((player) => player.id === playerId);
     if (p) {
@@ -202,60 +222,14 @@ const Host = () => {
   );
 
   if (gameState.isOver) {
-    return (
+    return renderWithNav((
       <div className="d-flex justify-content-center mt-4">
-      <div>
-        <p className="text-light big-text text-center">Game Over</p>
-      <div className="card darkBg mx-4 shadow mt-4" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
-        <div className="card-body">
-          <div className="d-flex justify-content-center mb-4 mt-2">
-            <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '80px' }} />
-          </div>
-          {scores.map((score) => (
-            <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
-              <div className="col-10 p-0 m-0">
-                <p key={score.name} className="text-light score-text nowrap" >{score.name}</p>
-              </div>
-              <div className="d-flex justify-content-start col-2 p-0 m-0 ml-2">
-                <p key={score.name} className="text-light score-text"><b>{score.score.total}</b></p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      </div>
-      </div>
-    );
-  }
-  switch (gameState.state) {
-    case 0:
-    case 1:
-      return (
-        <React.Fragment>
-          <PlayerList className="mb-3"/>
-          <div className="d-flex justify-content-around mt-5">
-            <div className="mx-4">
-              {gameState.state < 2 && (
-                <React.Fragment>
-                {gameState.state === 0 ? (
-                  <p className="text-light big-text">{'Waiting for '}<b>{getPlayerNameById(gameState.currentPlayer)}</b>{', to pick a card.'}</p>
-                ) : (
-                  <p className="text-light big-text">Pick a card to <b>{getPlayerNameById(gameState.currentPlayer)}</b>{'\'s sentence'}</p>
-                )}
-                <div className="d-flex justify-content-center mt-4">
-                  {circles.map((circle, i) => (
-                      <div key={i} className={`vote-circle-lg m-1 moving-circle rounded-circle mx-2 shadow${circle.active ? ' move-circle' : ''}`} style={{ backgroundColor: COLORS[circle.color] }}/>
-                  ))}
-                </div>
-                </React.Fragment>
-              )}
-            </div>
-            <div>
-              <p className="text-light round-counter-text text-center">Turns: <b>{gameState.rounds.current}/{gameState.rounds.total}</b></p>
-            <div className="card darkBg mx-4 shadow" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
-              <div className="card-body">
+        <div>
+          <p className="text-light big-text text-center">Game Over</p>
+          <div className="card darkBg mx-4 shadow mt-4" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
+            <div className="card-body">
               <div className="d-flex justify-content-center mb-4 mt-2">
-                <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '20mm' }} />
+                <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '80px' }} />
               </div>
               {scores.map((score) => (
                 <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
@@ -267,16 +241,62 @@ const Host = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    ));
+  }
+  switch (gameState.state) {
+    case 0:
+    case 1:
+      return renderWithNav((
+        <React.Fragment>
+          <PlayerList className="mb-3"/>
+          <div className="d-flex justify-content-around mt-5">
+            <div className="mx-4">
+              {gameState.state < 2 && (
+                <React.Fragment>
+                  {gameState.state === 0 ? (
+                    <p className="text-light big-text">{'Waiting for '}<b>{getPlayerNameById(gameState.currentPlayer)}</b>{', to pick a card.'}</p>
+                  ) : (
+                    <p className="text-light big-text">Pick a card to <b>{getPlayerNameById(gameState.currentPlayer)}</b>{'\'s sentence'}</p>
+                  )}
+                  <div className="d-flex justify-content-center mt-4">
+                    {circles.map((circle, i) => (
+                      <div key={i} className={`vote-circle-lg m-1 moving-circle rounded-circle mx-2 shadow${circle.active ? ' move-circle' : ''}`} style={{ backgroundColor: COLORS[circle.color] }}/>
+                    ))}
+                  </div>
+                </React.Fragment>
+              )}
+            </div>
+            <div>
+              <p className="text-light round-counter-text text-center">Turns: <b>{gameState.rounds.current}/{gameState.rounds.total}</b></p>
+              <div className="card darkBg mx-4 shadow" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
+                <div className="card-body">
+                  <div className="d-flex justify-content-center mb-4 mt-2">
+                    <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '20mm' }} />
+                  </div>
+                  {scores.map((score) => (
+                    <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
+                      <div className="col-10 p-0 m-0">
+                        <p key={score.name} className="text-light score-text nowrap" >{score.name}</p>
+                      </div>
+                      <div className="d-flex justify-content-start col-2 p-0 m-0 ml-2">
+                        <p key={score.name} className="text-light score-text"><b>{score.score.total}</b></p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-          </div>
         </React.Fragment>
-      );
+      ));
     case 2:
-      return renderTable();
+      return renderWithNav(renderTable());
     case 3:
-      return renderTable();
+      return renderWithNav(renderTable());
     default:
       return <h1>Error</h1>;
   }
