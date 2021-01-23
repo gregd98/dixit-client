@@ -15,6 +15,7 @@ function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
+    console.log('GETTER');
     restGet(`${Constants.SERVER_PATH}api/games`).then((result) => {
       if (result.game) {
         console.log(result);

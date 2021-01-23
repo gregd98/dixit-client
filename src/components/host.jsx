@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import socketIOClient from 'socket.io-client';
-import { loadGameData, updatePlayers, updateState } from '../actions/gameActions';
+import {loadGameData, resetGame, updatePlayers, updateState} from '../actions/gameActions';
 import PlayerList from './player_list.jsx';
 import { COLORS, SERVER_PATH } from '../constants';
 import { restGet } from '../utils/communication';
@@ -45,6 +45,9 @@ const Host = () => {
         console.log('Players:');
         console.log(payload);
         dispatch(updatePlayers(payload));
+      });
+      socket.on('game deleted', () => {
+        dispatch(resetGame());
       });
     }
   }, [dispatch, socket]);
@@ -113,17 +116,18 @@ const Host = () => {
             color: player.color,
             active: gameState.playersPicked.includes(player.id),
           })));
+        } else {
+          setCircles(otherPlayers.reduce((acc, player) => {
+            const { color } = player;
+            const pick = gameState.playersPicked.find((item) => item.playerId === player.id);
+            acc.push({
+              color, active: !!pick,
+            }, {
+              color, active: !!pick && pick.both,
+            });
+            return acc;
+          }, []));
         }
-        setCircles(otherPlayers.reduce((acc, player) => {
-          const { color } = player;
-          const pick = gameState.playersPicked.find((item) => item.playerId === player.id);
-          acc.push({
-            color, active: !!pick,
-          }, {
-            color, active: !!pick && pick.both,
-          });
-          return acc;
-        }, []));
         break;
       default: break;
     }
@@ -142,7 +146,12 @@ const Host = () => {
   };
 
   const renderVoteCircles = (cardIndex) => {
-    const v = gameState.votes.filter((vote) => vote.vote === cardIndex);
+    let v;
+    if (gameInfo.players.length < 7) {
+      v = gameState.votes.filter((vote) => vote.vote === cardIndex);
+    } else {
+      v = gameState.votes.filter((vote) => vote.votes.includes(cardIndex));
+    }
     return (
       <React.Fragment>
         {v.length > 0 && (
@@ -192,6 +201,32 @@ const Host = () => {
     </React.Fragment>
   );
 
+  if (gameState.isOver) {
+    return (
+      <div className="d-flex justify-content-center mt-4">
+      <div>
+        <p className="text-light big-text text-center">Game Over</p>
+      <div className="card darkBg mx-4 shadow mt-4" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
+        <div className="card-body">
+          <div className="d-flex justify-content-center mb-4 mt-2">
+            <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '80px' }} />
+          </div>
+          {scores.map((score) => (
+            <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
+              <div className="col-10 p-0 m-0">
+                <p key={score.name} className="text-light score-text nowrap" >{score.name}</p>
+              </div>
+              <div className="d-flex justify-content-start col-2 p-0 m-0 ml-2">
+                <p key={score.name} className="text-light score-text"><b>{score.score.total}</b></p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      </div>
+      </div>
+    );
+  }
   switch (gameState.state) {
     case 0:
     case 1:
@@ -215,10 +250,12 @@ const Host = () => {
                 </React.Fragment>
               )}
             </div>
+            <div>
+              <p className="text-light round-counter-text text-center">Turns: <b>{gameState.rounds.current}/{gameState.rounds.total}</b></p>
             <div className="card darkBg mx-4 shadow" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
               <div className="card-body">
               <div className="d-flex justify-content-center mb-4 mt-2">
-                <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '80px' }} />
+                <img src={`${SERVER_PATH}coup.png`} alt="coup" style={{ maxWidth: '20mm' }} />
               </div>
               {scores.map((score) => (
                 <div key={score.name} className="d-flex flex-row p-0 m-0 mr-2">
@@ -232,6 +269,7 @@ const Host = () => {
               ))}
               </div>
             </div>
+          </div>
           </div>
         </React.Fragment>
       );

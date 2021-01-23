@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import socketIOClient from 'socket.io-client';
-import { restGet, restPut } from '../utils/communication';
+import {restDelete, restGet, restPut} from '../utils/communication';
 import { SERVER_PATH } from '../constants';
-import { updatePlayers, updateState } from '../actions/gameActions';
+import {resetGame, updatePlayers, updateState} from '../actions/gameActions';
 import ErrorPage from './error_page.jsx';
 
 const Lobby = () => {
@@ -113,6 +113,18 @@ const Lobby = () => {
       });
   };
 
+  const cancelClicked = () => {
+    setPageDisabled(true);
+    setStartError('');
+    restDelete(`${SERVER_PATH}api/games`).then(() => {
+      dispatch(resetGame());
+      setPageDisabled(false);
+    }).catch((error) => {
+      setPageDisabled(false);
+      setStartError(`Error: ${error.message}`);
+    });
+  };
+
   const kickPlayer = (playerId) => {
     restPut(`${SERVER_PATH}api/games/kick`, { playerId }).catch((error) => {
       console.log(`Error: ${error.message}`);
@@ -196,13 +208,17 @@ const Lobby = () => {
                     Start game
                     {pageDisabled && <span className="spinner-border spinner-border-sm ml-2" role="status" aria-hidden="true" />}
                   </button>
-                  {startError && (<div className="alert alert-danger mt-4" role="alert">{startError}</div>)}
                 </React.Fragment>
               )}
             </React.Fragment>
           ) : (
             <p className="text-light small-text">Waiting players to join.</p>
           )}
+          <button onClick={cancelClicked} className="btn btn-lg btn-block btn-outline-danger mt-2" disabled={pageDisabled}>
+            Cancel
+            {pageDisabled && <span className="spinner-border spinner-border-sm ml-2" role="status" aria-hidden="true" />}
+          </button>
+          {startError && (<div className="alert alert-danger mt-4" role="alert">{startError}</div>)}
         </div>
         <div className="list-group edition-list shadow mx-4 darkBg">
           {gameInfo.players.map((player, i) => (

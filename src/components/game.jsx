@@ -3,7 +3,7 @@ import socketIOClient from 'socket.io-client';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetGame, updatePlayers, updateState } from '../actions/gameActions';
 import { COLORS, SERVER_PATH } from '../constants';
-import { restPut } from '../utils/communication';
+import {restDelete, restPut} from '../utils/communication';
 
 const classNames = require('classnames');
 
@@ -17,6 +17,8 @@ const Game = () => {
   const [circles, setCircles] = useState([]);
   const dispatch = useDispatch();
 
+  const [pageDisabled, setPageDisabled] = useState(false);
+
   useEffect(() => {
     const so = socketIOClient(`${window.location.hostname}/player`);
     setSocket(so);
@@ -29,10 +31,17 @@ const Game = () => {
   useEffect(() => {
     if (socket) {
       socket.on('state update', (payload) => {
+        console.log('State update');
+        console.log(payload);
         dispatch(updateState(payload));
       });
       socket.on('player update', (payload) => {
+        console.log('Player update');
+        console.log(payload);
         dispatch(updatePlayers(payload));
+      });
+      socket.on('game deleted', () => {
+        dispatch(resetGame());
       });
     }
   }, [dispatch, socket]);
@@ -48,11 +57,11 @@ const Game = () => {
       const v = [];
       const n = gameInfo.players.length !== 3 ? gameInfo.players.length : 5;
       for (let i = 1; i <= n; i += 1) {
-        if (gameInfo.players.length !== 3) {
-          if (i !== gameState.ownCardIndex) {
+        if (gameInfo.players.length === 3 || gameInfo.players.length >= 7) {
+          if (!gameState.ownCardIndex.includes(i)) {
             v.push(i);
           }
-        } else if (!gameState.ownCardIndex.includes(i)) {
+        } else if (i !== gameState.ownCardIndex) {
           v.push(i);
         }
       }
@@ -107,18 +116,21 @@ const Game = () => {
       .filter((player) => player.id !== gameState.currentPlayer);
     switch (gameState.state) {
       case 2:
+        const isActive = (playerId) => {
+          if (gameInfo.players.length < 7) {
+            return gameState.playersVoted.includes(playerId);
+          }
+          const playersVote = gameState.playersVoted.find((vote) => vote.playerId === playerId);
+          return !!(playersVote && playersVote.done);
+        };
         setCircles(otherPlayers.map((player) => ({
           color: player.color,
-          active: gameState.playersVoted.includes(player.id),
+          active: isActive(player.id),
         })));
         break;
       default: break;
     }
   }, [gameInfo.players, gameState]);
-
-  useEffect(() => {
-    console.log(circles);
-  }, [circles]);
 
   const getPlayerNameById = (playerId) => {
     const p = gameInfo.players.find((player) => player.id === playerId);
@@ -135,25 +147,46 @@ const Game = () => {
   }, [gameState.state]);
 
   const pickCard = () => {
-    // console.log(gameState.hand);
     console.log(selectedIndex);
-    restPut(`${SERVER_PATH}api/games/pick`, { pickedCard: gameState.hand[selectedIndex].id }).then(() => {
-      console.log('SUCCESS');
+    setPageDisabled(true);
+    restPut(`${SERVER_PATH}api/games/pick`, { pickedCard: gameState.hand[selectedIndex].id }).then((payload) => {
+      dispatch(updateState(payload));
+      setPageDisabled(false);
     }).catch((error) => {
+      setPageDisabled(false);
       console.log(`Error: ${error.message}`);
     });
   };
 
   const voteClicked = (vote) => {
-    restPut(`${SERVER_PATH}api/games/vote`, { vote }).then(() => {
-      console.log('SUCCESS');
+    setPageDisabled(true);
+    restPut(`${SERVER_PATH}api/games/vote`, { vote }).then((payload) => {
+      dispatch(updateState(payload));
+      setPageDisabled(false);
     }).catch((error) => {
+      setPageDisabled(false);
+      console.log(`Error: ${error.message}`);
+    });
+  };
+
+  const voteDone = () => {
+    setPageDisabled(true);
+    restPut(`${SERVER_PATH}api/games/vote`, { vote: 'done' }).then((payload) => {
+      dispatch(updateState(payload));
+      setPageDisabled(false);
+    }).catch((error) => {
+      setPageDisabled(false);
       console.log(`Error: ${error.message}`);
     });
   };
 
   const nextClicked = () => {
-    restPut(`${SERVER_PATH}api/games/next`, {}).catch((error) => {
+    setPageDisabled(true);
+    restPut(`${SERVER_PATH}api/games/next`, {}).then((payload) => {
+      dispatch(updateState(payload));
+      setPageDisabled(false);
+    }).catch((error) => {
+      setPageDisabled(false);
       console.log(`Error: ${error.message}`);
     });
   };
@@ -164,93 +197,131 @@ const Game = () => {
     });
   };
 
+  const returnToLobby = () => {
+    restPut(`${SERVER_PATH}api/games/reset`, {}).then((payload) => {
+      dispatch(updateState(payload));
+    }).catch((error) => {
+      console.log(error.message);
+    });
+  };
+
+  const terminateGame = () => {
+    restDelete(`${SERVER_PATH}api/games`).then(() => {
+      dispatch(resetGame());
+    }).catch((error) => {
+      console.log(error.message);
+    });
+  };
+
+  const isSecondVote = () => {
+    if (gameState.state === 2) {
+      if (gameInfo.players.length >= 7) {
+        const playersVote = gameState.playersVoted
+          .find((vote) => vote.playerId === gameInfo.playerId);
+        return playersVote && !playersVote.done;
+      }
+    }
+    return false;
+  };
+
+  const renderVoteCircles = () => (
+      <React.Fragment>
+        <p className="text-light text-center small-text p-0 my-2">Other players voting.</p>
+        <div className="d-flex justify-content-center mt-4">
+          {circles.map((circle, i) => (
+            <div key={i} className={`vote-circle-lg m-1 moving-circle rounded-circle mx-2 shadow${circle.active ? ' move-circle' : ''}`} style={{ backgroundColor: COLORS[circle.color] }}/>
+          ))}
+        </div>
+      </React.Fragment>
+  );
+
+  const renderVotes = () => (
+    <React.Fragment>
+      <p className="text-light text-center small-text p-0 mt-2">Voting</p>
+      <div className="d-grid gap-2 mx-2 mt-2">
+        {votes.map((vote) => (
+          <button key={vote} onClick={() => voteClicked(vote)} className="btn btn-lg btn-outline-light btn-block" type="button" disabled={pageDisabled}>{vote}</button>
+        ))}
+        {isSecondVote() && (
+          <button onClick={voteDone} className="btn btn-lg btn-outline-light btn-block mt-4" disabled={pageDisabled}>Done</button>
+        )}
+      </div>
+    </React.Fragment>
+  );
+
+  const renderCards = (withBtn, header) => (
+      <React.Fragment>
+        <p className="text-light text-center small-text p-0 my-2">{header}</p>
+        <div id="carouselExampleIndicators" className="carousel slide" data-bs-ride="carousel" data-bs-interval={false}>
+          <ol className="carousel-indicators">
+            {gameState.hand.map((_, i) => (
+              <CardIndicator key={i} index={i}/>
+            ))}
+          </ol>
+          <div className="carousel-inner">
+            {gameState.hand.map((card, i) => (
+              <CardImage key={i} fileName={card.fileName} index={i} />
+            ))}
+          </div>
+          <a className="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-bs-slide="prev">
+            <span className="carousel-control-prev-icon" aria-hidden="true"/><span className="sr-only">Previous</span>
+          </a>
+          <a className="carousel-control-next" href="#carouselExampleIndicators" role="button" data-bs-slide="next">
+            <span className="carousel-control-next-icon" aria-hidden="true"/><span className="sr-only">Next</span>
+          </a>
+          {withBtn && <button id="btn_pick" className="pick" onClick={pickCard} disabled={pageDisabled}>Pick this card</button>}
+        </div>
+      </React.Fragment>
+  );
+
   if (gameState.isStarted && !gameState.isOver) {
     const ownTurn = gameInfo.playerId === gameState.currentPlayer;
     switch (gameState.state) {
       case 0:
         if (ownTurn) {
-          return <Cards hand={gameState.hand}
-                        withBtn={true}
-                        header="Your turn!"
-                        pickFunc={pickCard}
-                  />;
+          return renderCards(true, 'Your turn!');
         }
-        return <Cards hand={gameState.hand}
-                      withBtn={false}
-                      header={`Waiting for ${getPlayerNameById(gameState.currentPlayer)}.`}
-                      pickFunc={pickCard}
-                />;
+        return renderCards(false, `Waiting for ${getPlayerNameById(gameState.currentPlayer)}.`);
       case 1:
         if (ownTurn) {
-          return <Cards hand={gameState.hand}
-                        withBtn={false}
-                        header={'Waiting for other players.'}
-                        pickFunc={pickCard}
-          />;
+          return renderCards(false, 'Waiting for other players.');
         }
         if (gameInfo.players.length !== 3) {
           if (gameState.playersPicked.includes(gameInfo.playerId)) {
-            return <Cards hand={gameState.hand}
-                          withBtn={false}
-                          header={'Waiting for other players.'}
-                          pickFunc={pickCard}
-            />;
+            return renderCards(false, 'Waiting for other players.');
           }
         } else {
           const playersPick = gameState.playersPicked
             .find((item) => item.playerId === gameInfo.playerId);
           if (playersPick) {
             if (playersPick.both) {
-              return <Cards hand={gameState.hand}
-                            withBtn={false}
-                            header={'Waiting for other players.'}
-                            pickFunc={pickCard}
-              />;
+              return renderCards(false, 'Waiting for other players.');
             }
-            return <Cards hand={gameState.hand}
-                          withBtn={true}
-                          header={`Pick another card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`}
-                          pickFunc={pickCard}
-            />;
+            return renderCards(true, `Pick another card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`);
           }
         }
-
-        return <Cards hand={gameState.hand}
-                      withBtn={true}
-                      header={`Pick a card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`}
-                      pickFunc={pickCard}
-        />;
+        return renderCards(true, `Pick a card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`);
       case 2:
-        if (ownTurn || gameState.playersVoted.includes(gameInfo.playerId)) {
-          return (
-            <React.Fragment>
-              <p className="text-light text-center small-text p-0 my-2">Other players voting.</p>
-              <div className="d-flex justify-content-center mt-4">
-                {circles.map((circle, i) => (
-                  <div key={i} className={`vote-circle-lg m-1 moving-circle rounded-circle mx-2 shadow${circle.active ? ' move-circle' : ''}`} style={{ backgroundColor: COLORS[circle.color] }}/>
-                ))}
-              </div>
-            </React.Fragment>
-          );
+        if (gameInfo.players.length >= 7) {
+          const playersVote = gameState.playersVoted
+            .find((vote) => vote.playerId === gameInfo.playerId);
+          if (ownTurn || (playersVote && playersVote.done)) {
+            return renderVoteCircles();
+          }
+        } else if (ownTurn || gameState.playersVoted.includes(gameInfo.playerId)) {
+          return renderVoteCircles();
         }
-        return (
-          <React.Fragment>
-            <p className="text-light text-center small-text p-0 mt-2">Voting</p>
-            <div className="d-grid gap-2 mx-2 mt-2">
-              {votes.map((vote) => (
-                <button key={vote} onClick={() => voteClicked(vote)} className="btn btn-lg btn-outline-light btn-block" type="button">{vote}</button>
-              ))}
-            </div>
-          </React.Fragment>
-        );
+        return renderVotes();
       case 3:
         return (
           <React.Fragment>
             {gameInfo.players
               .find((player) => player.id === gameInfo.playerId && player.isAdmin) && (
-              <div className="d-flex justify-content-center my-4">
-                <button className="btn btn-outline-light" onClick={nextClicked}>Next</button>
-              </div>
+                <div className="mx-2 mt-4">
+                  <button className="btn btn-block btn-lg btn-outline-light" onClick={nextClicked} disabled={pageDisabled}>
+                    Next
+                  </button>
+                </div>
             )}
             <div className="d-flex justify-content-center my-4">
             <div className="card darkBg mx-4 shadow" style={{ width: '280px', maxWidth: '280px', minWidth: '280px' }}>
@@ -303,6 +374,17 @@ const Game = () => {
             </div>
           </div>
         </div>
+        {gameInfo.players
+          .find((player) => player.id === gameInfo.playerId && player.isAdmin) && (
+          <div className="mx-2 mt-4">
+            <button className="btn btn-block btn-lg btn-outline-light" onClick={returnToLobby} disabled={pageDisabled}>
+              Return to lobby
+            </button>
+            <button className="btn btn-block btn-lg btn-outline-danger" onClick={terminateGame} disabled={pageDisabled}>
+              Exit
+            </button>
+          </div>
+        )}
       </React.Fragment>
     );
   }
@@ -312,38 +394,6 @@ const Game = () => {
       <p className="text-light text-center medium-text p-0 mt-4">Waiting to start</p>
       <div className="d-flex justify-content-center mt-4">
         <button onClick={exitGame} className="btn btn-lg btn-outline-danger">Exit</button>
-      </div>
-    </React.Fragment>
-  );
-};
-
-const Cards = (input) => {
-  const {
-    withBtn, header, hand, pickFunc,
-  } = input;
-  return (
-    <React.Fragment>
-      <p className="text-light text-center small-text p-0 my-2">{header}</p>
-      <div id="carouselExampleIndicators" className="carousel slide" data-bs-ride="carousel" data-bs-interval={false}>
-        <ol className="carousel-indicators">
-          {hand.map((_, i) => (
-            <CardIndicator key={i} index={i}/>
-          ))}
-        </ol>
-        <div className="carousel-inner">
-          {hand.map((card, i) => (
-            <CardImage key={i} fileName={card.fileName} index={i} />
-          ))}
-        </div>
-        <a className="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-bs-slide="prev">
-          <span className="carousel-control-prev-icon" aria-hidden="true" />
-          <span className="sr-only">Previous</span>
-        </a>
-        <a className="carousel-control-next" href="#carouselExampleIndicators" role="button" data-bs-slide="next">
-          <span className="carousel-control-next-icon" aria-hidden="true" />
-          <span className="sr-only">Next</span>
-        </a>
-        {withBtn && <a id="btn_pick" className="pick" onClick={pickFunc}>Pick this card</a>}
       </div>
     </React.Fragment>
   );

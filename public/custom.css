@@ -30,6 +30,13 @@ body {
     top: 0;
     transform: translate(-50%, 0%);
     border-radius: 0 0 3px 3px;
+    border: 0;
+}
+
+.pick:focus,
+.pick:active{
+    border:0;
+    outline:none;
 }
 
 .vote-num {
@@ -80,7 +87,7 @@ body {
 }
 
 .user-name {
-    font-size: 16px;
+    font-size: 5mm;
 }
 
 .carousel-inner .carousel-item {
@@ -132,6 +139,11 @@ body {
 .lobby-mono {
     font-family: 'Roboto Mono', monospace;
     font-size: 12mm;
+}
+
+.round-counter-text {
+    font-family: 'Roboto', sans-serif;
+    font-size: 8mm;
 }
 
 .code-spacing {
