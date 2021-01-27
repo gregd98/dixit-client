@@ -15,29 +15,26 @@ function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    console.log('GETTER');
     restGet(`${Constants.SERVER_PATH}api/games`).then((result) => {
       if (result.game) {
-        console.log(result);
         dispatch(loadGameData(result));
       } else {
         dispatch(resetGame());
       }
     }).catch((error) => {
-      console.log(error.message);
+      console.log(`Error: ${error.message}`);
     });
   }, [dispatch]);
 
   const hostClicked = () => {
     restPut(`${Constants.SERVER_PATH}api/games`).then((result) => {
       if (result.game) {
-        console.log(result);
         dispatch(loadGameData(result));
       } else {
         dispatch(resetGame());
       }
     }).catch((error) => {
-      console.log(error.message);
+      console.log(`Error: ${error.message}`);
     });
   };
 
@@ -45,7 +42,6 @@ function App() {
     dispatch(loadGameType('player'));
   };
 
-  console.log(`GameType: ${gameType}`);
   if (gameType) {
     if (gameType === 'host') {
       if (isStarted) {

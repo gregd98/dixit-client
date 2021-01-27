@@ -5,8 +5,6 @@ import { resetGame, updatePlayers, updateState } from '../actions/gameActions';
 import { COLORS, SERVER_PATH } from '../constants';
 import { restDelete, restPut } from '../utils/communication';
 
-const classNames = require('classnames');
-
 const Game = () => {
   const gameInfo = useSelector((state) => state.game.game);
   const gameState = useSelector((state) => state.game.state);
@@ -31,13 +29,9 @@ const Game = () => {
   useEffect(() => {
     if (socket) {
       socket.on('state update', (payload) => {
-        console.log('State update');
-        console.log(payload);
         dispatch(updateState(payload));
       });
       socket.on('player update', (payload) => {
-        console.log('Player update');
-        console.log(payload);
         dispatch(updatePlayers(payload));
       });
       socket.on('game deleted', () => {
@@ -96,7 +90,6 @@ const Game = () => {
 
   useEffect(() => {
     window.$(document).on('slid.bs.carousel', '#carouselExampleIndicators', (e) => {
-      console.log(e.to);
       setSelectedIndex(e.to);
     });
     return () => {
@@ -109,16 +102,15 @@ const Game = () => {
       .filter((player) => player.id !== gameState.currentPlayer);
     switch (gameState.state) {
       case 2:
-        const isActive = (playerId) => {
-          if (gameInfo.players.length < 7) {
-            return gameState.playersVoted.includes(playerId);
-          }
-          const playersVote = gameState.playersVoted.find((vote) => vote.playerId === playerId);
-          return !!(playersVote && playersVote.done);
-        };
         setCircles(otherPlayers.map((player) => ({
           color: player.color,
-          active: isActive(player.id),
+          active: (() => {
+            if (gameInfo.players.length < 7) {
+              return gameState.playersVoted.includes(player.id);
+            }
+            const playersVote = gameState.playersVoted.find((vote) => vote.playerId === player.id);
+            return !!(playersVote && playersVote.done);
+          })(),
         })));
         break;
       default: break;
@@ -139,8 +131,45 @@ const Game = () => {
     }
   }, [gameState.state]);
 
+  useEffect(() => {
+    let xDown = null;
+    let yDown = null;
+    const getTouches = (e) => e.touches || e.originalEvent.touches;
+
+    const handleTouchStart = (e) => {
+      const firstTouch = getTouches(e)[0];
+      xDown = firstTouch.clientX;
+      yDown = firstTouch.clientY;
+    };
+
+    const handleTouchMove = (e) => {
+      if (xDown && yDown) {
+        const xUp = e.touches[0].clientX;
+        const yUp = e.touches[0].clientY;
+        const xDiff = xDown - xUp;
+        const yDiff = yDown - yUp;
+        if (Math.abs(xDiff) > Math.abs(yDiff)) {
+          if (xDiff > 0) {
+            window.$('#carouselExampleIndicators').carousel('next');
+          } else {
+            window.$('#carouselExampleIndicators').carousel('prev');
+          }
+        }
+        xDown = null;
+        yDown = null;
+      }
+    };
+    if (gameState.isStarted) {
+      document.addEventListener('touchstart', handleTouchStart, false);
+      document.addEventListener('touchmove', handleTouchMove, false);
+    }
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart, false);
+      document.removeEventListener('touchmove', handleTouchMove, false);
+    };
+  }, [gameState.isStarted]);
+
   const pickCard = () => {
-    console.log(selectedIndex);
     setPageDisabled(true);
     restPut(`${SERVER_PATH}api/games/pick`, { pickedCard: gameState.hand[selectedIndex].id }).then((payload) => {
       dispatch(updateState(payload));
@@ -194,7 +223,7 @@ const Game = () => {
     restPut(`${SERVER_PATH}api/games/reset`, {}).then((payload) => {
       dispatch(updateState(payload));
     }).catch((error) => {
-      console.log(error.message);
+      console.log(`Error: ${error.message}`);
     });
   };
 
@@ -202,7 +231,7 @@ const Game = () => {
     restDelete(`${SERVER_PATH}api/games`).then(() => {
       dispatch(resetGame());
     }).catch((error) => {
-      console.log(error.message);
+      console.log(`Error: ${error.message}`);
     });
   };
 
@@ -242,19 +271,31 @@ const Game = () => {
     </React.Fragment>
   );
 
+  const renderCardIndicator = (index) => (
+      <React.Fragment key={index}>
+        {index === selectedIndex ? (
+          <li data-bs-target="#carouselExampleIndicators" className="active" data-bs-slide-to={index} />
+        ) : (
+          <li data-bs-target="#carouselExampleIndicators" data-bs-slide-to={index} />
+        )}
+      </React.Fragment>
+  );
+
+  const renderCardImage = (fileName, index) => (
+    <div className={`carousel-item${index === selectedIndex ? ' active' : ''}`} key={index}>
+      <img src={`${SERVER_PATH}cards/${fileName}`} className="d-block w-100" alt={fileName} />
+    </div>
+  );
+
   const renderCards = (withBtn, header) => (
       <React.Fragment>
         <p className="text-light text-center small-text p-0 my-2">{header}</p>
-        <div id="carouselExampleIndicators" className="carousel slide" data-bs-ride="carousel" data-bs-interval={false}>
+        <div id="carouselExampleIndicators" className="carousel slide" data-bs-ride="carousel" data-bs-interval={false} data-bs-touch={false}>
           <ol className="carousel-indicators">
-            {gameState.hand.map((_, i) => (
-              <CardIndicator key={i} index={i}/>
-            ))}
+            {gameState.hand.map((_, i) => renderCardIndicator(i))}
           </ol>
           <div className="carousel-inner">
-            {gameState.hand.map((card, i) => (
-              <CardImage key={i} fileName={card.fileName} index={i} />
-            ))}
+            {gameState.hand.map((card, i) => renderCardImage(card.fileName, i))}
           </div>
           <a className="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-bs-slide="prev">
             <span className="carousel-control-prev-icon" aria-hidden="true"/><span className="sr-only">Previous</span>
@@ -345,8 +386,6 @@ const Game = () => {
     }
   }
   if (gameState.isOver) {
-    console.log('Game over scores:');
-    console.log(scores);
     return (
       <React.Fragment>
         <p className="text-light text-center small-text p-0 mt-2">Game Over</p>
@@ -390,32 +429,6 @@ const Game = () => {
       <div className="d-flex justify-content-center mt-4">
         <button onClick={exitGame} className="btn btn-lg btn-outline-danger">Exit</button>
       </div>
-    </React.Fragment>
-  );
-};
-
-const CardImage = (input) => {
-  const { fileName, index } = input;
-  const classes = classNames({
-    'carousel-item': true,
-    active: index === 0,
-  });
-  return (
-    <div className={classes}>
-      <img src={`${SERVER_PATH}cards/${fileName}`} className="d-block w-100" alt={fileName} />
-    </div>
-  );
-};
-
-const CardIndicator = (input) => {
-  const { index } = input;
-  return (
-    <React.Fragment>
-      {index === 0 ? (
-        <li data-bs-target="#carouselExampleIndicators" className="active" data-bs-slide-to={index} />
-      ) : (
-        <li data-bs-target="#carouselExampleIndicators" data-bs-slide-to={index} />
-      )}
     </React.Fragment>
   );
 };

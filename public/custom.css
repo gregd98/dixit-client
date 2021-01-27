@@ -90,8 +90,8 @@ body {
     font-size: 5mm;
 }
 
-.carousel-inner .carousel-item {
-    transition: transform 0s ease;
+.carousel-inner > .carousel-item {
+    transition: transform 0s;
 }
 
 .nowrap {

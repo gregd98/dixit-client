@@ -25,7 +25,7 @@ const Host = () => {
         dispatch(loadGameData(result));
       }
     }).catch((error) => {
-      console.log(error.message);
+      console.log(`Error: ${error.message}`);
     });
   }, [dispatch]);
 
@@ -133,15 +133,11 @@ const Host = () => {
     }
   }, [gameInfo.players, gameState]);
 
-  useEffect(() => {
-    console.log(circles);
-  }, [circles]);
-
   const exitGame = () => {
     restDelete(`${SERVER_PATH}api/games`).then(() => {
       dispatch(resetGame());
     }).catch((error) => {
-      console.log(error.message);
+      console.log(`Error: ${error.message}`);
     });
   };
 
