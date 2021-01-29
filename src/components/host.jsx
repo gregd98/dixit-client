@@ -5,6 +5,7 @@ import {
   loadGameData, resetGame, updatePlayers, updateState,
 } from '../actions/gameActions';
 import PlayerList from './player_list.jsx';
+import { ConfirmationDialog } from './dialog_utils.jsx';
 import { COLORS, SERVER_PATH } from '../constants';
 import { restDelete, restGet } from '../utils/communication';
 import * as Constants from '../constants';
@@ -17,7 +18,26 @@ const Host = () => {
   const [maxCardHeight, setMaxCardHeight] = useState(0);
   const [maxCardWidth, setMaxCardWidth] = useState(0);
   const [circles, setCircles] = useState([]);
+  const [exitDialog, setExitDialog] = useState({
+    text: '',
+    btnHandler: () => {},
+    isLoading: false,
+    errorMessage: '',
+  });
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    const removeModal = () => {
+      window.$('#exitDialog').modal('hide');
+      window.$('body').removeClass('modal-open');
+      // window.$('.modal-backdrop').remove();
+    };
+    window.onpopstate = removeModal;
+    return () => {
+      removeModal();
+      window.onpopstate = () => {};
+    };
+  }, []);
 
   useEffect(() => {
     restGet(`${Constants.SERVER_PATH}api/games`).then((result) => {
@@ -133,12 +153,26 @@ const Host = () => {
     }
   }, [gameInfo.players, gameState]);
 
-  const exitGame = () => {
-    restDelete(`${SERVER_PATH}api/games`).then(() => {
+  const exitDialogConfirmed = async () => {
+    try {
+      setExitDialog((rest) => ({ ...rest, isLoading: true }));
+      await restDelete(`${SERVER_PATH}api/games`);
+      // window.$('#exitDialog').modal('hide');
       dispatch(resetGame());
-    }).catch((error) => {
-      console.log(`Error: ${error.message}`);
+    } catch (error) {
+      setExitDialog((rest) => ({ ...rest, isLoading: false, errorMessage: `Error: ${error.message}` }));
+    }
+  };
+
+  const exitGame = (e) => {
+    e.stopPropagation();
+    setExitDialog({
+      text: 'Are you sure you want to exit the game?',
+      btnHandler: exitDialogConfirmed,
+      isLoading: false,
+      errorMessage: '',
     });
+    window.$('#exitDialog').modal('show');
   };
 
   const renderWithNav = (content) => (
@@ -148,6 +182,13 @@ const Host = () => {
           <span onClick={exitGame} className="material-icons text-danger exit-icon clickable float-right p-0 mr-2 mt-2">close</span>
         </nav>
         {content}
+        <ConfirmationDialog id="exitDialog"
+                            text={exitDialog.text}
+                            btnText="Exit"
+                            btnType="danger"
+                            btnHandler={exitDialog.btnHandler}
+                            isLoading={exitDialog.isLoading}
+                            errorMessage={exitDialog.errorMessage}/>
       </React.Fragment>
   );
 

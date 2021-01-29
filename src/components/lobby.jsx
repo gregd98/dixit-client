@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import socketIOClient from 'socket.io-client';
-import {restDelete, restGet, restPut} from '../utils/communication';
+import { restDelete, restGet, restPut } from '../utils/communication';
 import { SERVER_PATH } from '../constants';
-import {resetGame, updatePlayers, updateState} from '../actions/gameActions';
+import { resetGame, updatePlayers, updateState } from '../actions/gameActions';
 import ErrorPage from './error_page.jsx';
+import {ConfirmationDialog} from './dialog_utils';
 
 const Lobby = () => {
   const gameInfo = useSelector((state) => state.game.game);
@@ -21,7 +22,27 @@ const Lobby = () => {
   const [pageError, setPageError] = useState({});
   const [isLoading, setLoading] = useState(true);
 
+  const [exitDialog, setExitDialog] = useState({
+    text: '',
+    btnHandler: () => {},
+    isLoading: false,
+    errorMessage: '',
+  });
+
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    const removeModal = () => {
+      window.$('#exitDialog').modal('hide');
+      window.$('body').removeClass('modal-open');
+      // window.$('.modal-backdrop').remove();
+    };
+    window.onpopstate = removeModal;
+    return () => {
+      removeModal();
+      window.onpopstate = () => {};
+    };
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -104,8 +125,6 @@ const Lobby = () => {
     restPut(`${SERVER_PATH}api/games/start`, {
       editions: Array.from(checkedEditions),
       cardCount: Number.parseInt(cardCount.value, 10),
-    }).then(() => {
-      setPageDisabled(false);
     })
       .catch((error) => {
         setPageDisabled(false);
@@ -113,16 +132,33 @@ const Lobby = () => {
       });
   };
 
-  const cancelClicked = () => {
-    setPageDisabled(true);
-    setStartError('');
-    restDelete(`${SERVER_PATH}api/games`).then(() => {
+  const exitDialogConfirmed = async () => {
+    try {
+      setPageDisabled(true);
+      setExitDialog((rest) => ({ ...rest, isLoading: true }));
+      await restDelete(`${SERVER_PATH}api/games`);
+      setPageDisabled(false);
+      // window.$('#exitDialog').modal('hide');
       dispatch(resetGame());
+    } catch (error) {
       setPageDisabled(false);
-    }).catch((error) => {
-      setPageDisabled(false);
-      setStartError(`Error: ${error.message}`);
-    });
+      setExitDialog((rest) => ({ ...rest, isLoading: false, errorMessage: `Error: ${error.message}` }));
+    }
+  };
+
+  const exitGame = (e, playerCount) => {
+    if (playerCount > 0) {
+      e.stopPropagation();
+      setExitDialog({
+        text: 'Are you sure you want to exit the lobby?',
+        btnHandler: exitDialogConfirmed,
+        isLoading: false,
+        errorMessage: '',
+      });
+      window.$('#exitDialog').modal('show');
+    } else {
+      exitDialogConfirmed();
+    }
   };
 
   const kickPlayer = (playerId) => {
@@ -214,7 +250,7 @@ const Lobby = () => {
           ) : (
             <p className="text-light small-text">Waiting players to join.</p>
           )}
-          <button onClick={cancelClicked} className="btn btn-lg btn-block btn-outline-danger mt-2" disabled={pageDisabled}>
+          <button onClick={(e) => exitGame(e, gameInfo.players.length)} className="btn btn-lg btn-block btn-outline-danger mt-2" disabled={pageDisabled}>
             Cancel
             {pageDisabled && <span className="spinner-border spinner-border-sm ml-2" role="status" aria-hidden="true" />}
           </button>
@@ -239,6 +275,13 @@ const Lobby = () => {
           ))}
         </div>
       </div>
+      <ConfirmationDialog id="exitDialog"
+                          text={exitDialog.text}
+                          btnText="Exit"
+                          btnType="danger"
+                          btnHandler={exitDialog.btnHandler}
+                          isLoading={exitDialog.isLoading}
+                          errorMessage={exitDialog.errorMessage}/>
     </React.Fragment>
   );
 };
