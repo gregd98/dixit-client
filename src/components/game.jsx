@@ -13,6 +13,7 @@ const Game = () => {
   const [votes, setVotes] = useState([]);
   const [scores, setScores] = useState([]);
   const [circles, setCircles] = useState([]);
+  const [voteLoading, setVoteLoading] = useState(true);
   const dispatch = useDispatch();
 
   const [pageDisabled, setPageDisabled] = useState(false);
@@ -169,6 +170,15 @@ const Game = () => {
     };
   }, [gameState.isStarted]);
 
+  useEffect(() => {
+    if (gameState.state === 2) {
+      setVoteLoading(true);
+      setTimeout(() => {
+        setVoteLoading(false);
+      }, 2000);
+    }
+  }, [gameState.state]);
+
   const pickCard = () => {
     setPageDisabled(true);
     restPut(`${SERVER_PATH}api/games/pick`, { pickedCard: gameState.hand[selectedIndex].id }).then((payload) => {
@@ -271,6 +281,15 @@ const Game = () => {
     </React.Fragment>
   );
 
+  const renderVoteLoading = () => (
+    <React.Fragment>
+      <p className="text-light text-center small-text p-0 mt-2">Voting</p>
+      <div className="d-flex justify-content-center mt-4">
+        <div className="spinner-grow text-light vote-loading" role="status" />
+      </div>
+    </React.Fragment>
+  );
+
   const renderCardIndicator = (index) => (
       <React.Fragment key={index}>
         {index === selectedIndex ? (
@@ -336,6 +355,9 @@ const Game = () => {
         }
         return renderCards(true, `Pick a card to ${getPlayerNameById(gameState.currentPlayer)}'s sentence.`);
       case 2:
+        if (!ownTurn && voteLoading) {
+          return renderVoteLoading();
+        }
         if (gameInfo.players.length >= 7) {
           const playersVote = gameState.playersVoted
             .find((vote) => vote.playerId === gameInfo.playerId);
@@ -434,3 +456,5 @@ const Game = () => {
 };
 
 export default Game;
+
+// TODO a cancelhez es x-hez megerosito dialog

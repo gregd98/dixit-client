@@ -205,3 +205,8 @@ img {
     height: 20mm;
     max-height: 20mm;
 }
+
+.vote-loading {
+    width: 40px;
+    height: 40px;
+}
