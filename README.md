@@ -12,4 +12,4 @@ Run: `npm start`
 
 Build: `npm run build`
 
-_To switch localhost to build version, you need to edit **constants.js**_
+_To switch localhost to build version, you need to edit **src/constants.js**_
